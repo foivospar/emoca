@@ -81,7 +81,7 @@ class FAN(FaceDetector):
             "filter_threshold": threshold
         }
         self.flip_input = False
-        self.model = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D,
+        self.model = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D,
                                                   device=str(device),
                                                   flip_input=self.flip_input,
                                                   face_detector=self.face_detector,

@@ -138,14 +138,25 @@ class Pytorch3dRasterizer(nn.Module):
         raster_settings = util.dict2obj(raster_settings)
         self.raster_settings = raster_settings
 
-    def forward(self, vertices, faces, attributes=None):
+    def forward(self, vertices, faces, attributes=None, h=None, w=None):
+
+        # Adapted based on https://github.com/adobe-research/diffusion-rig/blob/92324f7582ef316b07870e9d9dcbcdd01cc4d77c/decalib/utils/renderer.py#L130
+
         fixed_vertices = vertices.clone()
         fixed_vertices[..., :2] = -fixed_vertices[..., :2]
         meshes_screen = Meshes(verts=fixed_vertices.float(), faces=faces.long())
         raster_settings = self.raster_settings
+        if h is None and w is None:
+            image_size = raster_settings.image_size
+        else:
+            image_size = [h, w]
+            if h>w:
+                fixed_vertices[..., 1] = fixed_vertices[..., 1]*h/w
+            else:
+                fixed_vertices[..., 0] = fixed_vertices[..., 0]*w/h
         pix_to_face, zbuf, bary_coords, dists = rasterize_meshes(
             meshes_screen,
-            image_size=raster_settings.image_size,
+            image_size=image_size,
             blur_radius=raster_settings.blur_radius,
             faces_per_pixel=raster_settings.faces_per_pixel,
             bin_size=raster_settings.bin_size,
@@ -214,7 +225,7 @@ class SRenderY(nn.Module):
              (pi / 4) * (1 / 2) * (np.sqrt(5 / (4 * pi)))]).float()
         self.register_buffer('constant_factor', constant_factor)
 
-    def forward(self, vertices, transformed_vertices, albedos, lights=None, light_type='point'):
+    def forward(self, vertices, transformed_vertices, albedos, lights=None, h=None, w=None, light_type='point'):
         '''
         -- Texture Rendering
         vertices: [batch_size, V, 3], vertices in world space, for calculating normals, then shading
@@ -244,7 +255,7 @@ class SRenderY(nn.Module):
                                -1)
 
         # rasterize
-        rendering = self.rasterizer(transformed_vertices, self.faces.expand(batch_size, -1, -1), attributes)
+        rendering = self.rasterizer(transformed_vertices, self.faces.expand(batch_size, -1, -1), attributes, h, w)
 
         ####
         # vis mask
@@ -290,13 +301,13 @@ class SRenderY(nn.Module):
         # exit()
         outputs = {
             'images': images * alpha_images,
-            'albedo_images': albedo_images,
+            'albedo_images': albedo_images*alpha_images,
             'alpha_images': alpha_images,
             'pos_mask': pos_mask,
             'shading_images': shading_images,
             'grid': grid,
             'normals': normals,
-            'normal_images': normal_images,
+            'normal_images': normal_images*alpha_images,
             'transformed_normals': transformed_normals,
         }
 

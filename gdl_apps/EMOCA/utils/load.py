@@ -5,7 +5,7 @@ from omegaconf import OmegaConf
 
 from gdl.models.DECA import DecaModule
 from gdl.models.IO import locate_checkpoint
-from gdl_apps.EMOCA.training.test_and_finetune_deca import prepare_data
+#from gdl_apps.EMOCA.training.test_and_finetune_deca import prepare_data
 from gdl.utils.other import get_path_to_assets
 
 

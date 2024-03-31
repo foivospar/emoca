@@ -197,3 +197,49 @@ def video2sequence(video_path):
         imagepath_list.append(imagepath)
     print('video frames are stored in {}'.format(videofolder))
     return imagepath_list
+
+
+def preprocess_for_emoca(img, face_detector, crop_size=224, scale=1.25, scaling_factor=1.0):
+
+    # img: PIL Image
+    
+    resolution_inp = crop_size
+
+    image = np.array(img.convert('RGB'))
+
+    if scaling_factor != 1.:
+        image = rescale(image, (scaling_factor, scaling_factor, 1))*255.
+
+    h, w, _ = image.shape
+    
+    bbox, bbox_type = face_detector.run(image)
+    if len(bbox) < 1:
+        print('no face detected! run original image')
+        left = 0
+        right = h - 1
+        top = 0
+        bottom = w - 1
+        old_size, center = bbox2point(left, right, top, bottom, type=bbox_type)
+    else:
+        bbox = sorted(bbox, key=lambda x:(x[2]-x[0])*(x[3]-x[1]))[-1]  # select largest face (if more than one detected)
+        left = bbox[0]
+        right = bbox[2]
+        top = bbox[1]
+        bottom = bbox[3]
+        old_size, center = bbox2point(left, right, top, bottom, type=bbox_type)
+
+    size = int(old_size * scale)
+    src_pts = np.array(
+        [[center[0] - size / 2, center[1] - size / 2], [center[0] - size / 2, center[1] + size / 2],
+        [center[0] + size / 2, center[1] - size / 2]])
+
+    image = image / 255.
+
+    DST_PTS = np.array([[0, 0], [0, resolution_inp - 1], [resolution_inp - 1, 0]])
+    tform = estimate_transform('similarity', src_pts, DST_PTS)
+    dst_image = warp(image, tform.inverse, output_shape=(resolution_inp, resolution_inp))
+    dst_image = dst_image.transpose(2, 0, 1)
+    return {'image': torch.tensor(dst_image).float(),
+            'tform': torch.tensor(tform.params).float(),
+            'original_image': torch.tensor(image.transpose(2,0,1)).float(),
+            }
